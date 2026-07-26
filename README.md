@@ -1,6 +1,6 @@
-# Wordle Solver (iOS) 🟩🟨⬛️
+# NextGuess Five (iOS) 🟩🟨⬛️
 
-A fast, data-driven Wordle companion that **narrows the solution space instantly** and recommends the **next best guess** using information theory and worst-case analysis. Built with **SwiftUI** and optimized with **offline precomputation** for near-instant suggestions even with large word lists.
+A fast, data-driven companion for five-letter word puzzles that **narrows the solution space instantly** and recommends the **next best guess** using information theory and worst-case analysis. Built with **SwiftUI** and optimized with **offline precomputation** for near-instant suggestions even with large word lists.
 
 ---
 
@@ -66,7 +66,7 @@ A bundled binary file:
 - Lookup formula:
   - `patternTable[guessIndex * answersCount + answerIndex]`
 
-This avoids recomputing Wordle feedback rules inside the hot loop.
+This avoids recomputing five-letter puzzle feedback rules inside the hot loop.
 
 ### Why not precompute “best guess for every state”?
 Because the number of possible candidate sets is astronomical (`2^N`).  
@@ -168,7 +168,7 @@ Precompute the top openers (Hybrid by default) to show suggestions instantly bef
 ---
 
 ## 🧪 Notes on correctness (duplicate letters)
-The underlying pattern encoding matches Wordle logic:
+The underlying pattern encoding applies standard gray/yellow/green puzzle logic:
 - Greens are matched first
 - Remaining letters are counted for yellows
 - Encoded as base-3 digits across 5 positions (0..242)
@@ -179,13 +179,13 @@ The underlying pattern encoding matches Wordle logic:
 - Mode-specific opener lists (Hybrid/Average/Worst-case)
 - Persist game sessions & history across launches
 - Candidate list screen with search/filter
-- Optional “hard mode enforcement” rules like official Wordle
+- Optional constraint-based hard-mode enforcement
 - Extra analytics (solve distribution, average guesses, etc.)
 
 ---
 
 ## ⚖️ License / Word list note
-This is a personal project. If you plan to distribute publicly, ensure your word lists and any Wordle-related branding comply with applicable licenses and trademarks.
+If you distribute the app publicly, ensure the bundled word lists and all third-party materials comply with their applicable licenses and trademarks.
 
 ---
 
