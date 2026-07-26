@@ -1,6 +1,6 @@
 # NextGuess Five (iOS) 🟩🟨⬛️
 
-A fast, data-driven companion for five-letter word puzzles that **narrows the solution space instantly** and recommends the **next best guess** using information theory and worst-case analysis. Built with **SwiftUI** and optimized with **offline precomputation** for near-instant suggestions even with large word lists.
+NextGuess Five is a fast, data-driven companion for five-letter word puzzles. It **narrows the solution space instantly** and recommends the **next best guess** using information theory and worst-case analysis. Built with **SwiftUI** and optimized with **offline precomputation** for near-instant suggestions even with large word lists.
 
 ---
 
@@ -66,7 +66,7 @@ A bundled binary file:
 - Lookup formula:
   - `patternTable[guessIndex * answersCount + answerIndex]`
 
-This avoids recomputing five-letter puzzle feedback rules inside the hot loop.
+This avoids recomputing five-letter word puzzle feedback rules inside the hot loop.
 
 ### Why not precompute “best guess for every state”?
 Because the number of possible candidate sets is astronomical (`2^N`).  

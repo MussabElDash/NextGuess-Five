@@ -51,9 +51,21 @@ struct ContentView: View {
 	private var currentGuess: String {
 		rows[rows.count - 1].word
 	}
-
+	
+	private var isShowingPrecomputedOpeners: Bool {
+		solver.candidateCount == solver.answers.count &&
+		rows.count == 1 &&
+		(rows.first?.word.isEmpty ?? true)
+	}
+	
 	private var canAddGuess: Bool {
-		currentGuess.count == 5 && solver.isAllowedGuess(currentGuess)
+		!hasNoCandidates &&
+		currentGuess.count == 5 &&
+		solver.isAllowedGuess(currentGuess)
+	}
+	
+	private var hasNoCandidates: Bool {
+		solver.candidateCount == 0
 	}
 
 	private var fieldState: GuessTextFieldTile.FieldState {
@@ -75,7 +87,7 @@ struct ContentView: View {
 				}
 				.frame(maxWidth: .infinity, maxHeight: .infinity)
 			}
-			//			.navigationTitle("Wordle Solver")
+			//			.navigationTitle("NextGuess Five")
 			.sheet(isPresented: $showAbout) {
 				AboutView()
 			}
@@ -118,7 +130,26 @@ struct ContentView: View {
 				}
 
 				Section("Top Suggestions") {
-					suggestionsRows
+					if hasNoCandidates {
+						VStack(spacing: 8) {
+							Image(systemName: "exclamationmark.triangle")
+								.font(.title2)
+								.foregroundStyle(.orange)
+
+							Text("No possible answers remain")
+								.font(.headline)
+
+							Text("The entered feedback is inconsistent with the available answer list. Check the tile colors or undo the last guess.")
+								.font(.caption)
+								.foregroundStyle(.secondary)
+								.multilineTextAlignment(.center)
+						}
+						.frame(maxWidth: .infinity)
+						.padding(.vertical, 20)
+						.listRowSeparator(.hidden)
+					} else {
+						suggestionsRows
+					}
 				}
 
 				mainControls
@@ -187,7 +218,26 @@ struct ContentView: View {
 			// RIGHT column: suggestions list
 			List {
 				Section("Top Suggestions") {
-					suggestionsRows
+					if hasNoCandidates {
+						VStack(spacing: 8) {
+							Image(systemName: "exclamationmark.triangle")
+								.font(.title2)
+								.foregroundStyle(.orange)
+
+							Text("No possible answers remain")
+								.font(.headline)
+
+							Text("The entered feedback is inconsistent with the available answer list. Check the tile colors or undo the last guess.")
+								.font(.caption)
+								.foregroundStyle(.secondary)
+								.multilineTextAlignment(.center)
+						}
+						.frame(maxWidth: .infinity)
+						.padding(.vertical, 20)
+						.listRowSeparator(.hidden)
+					} else {
+						suggestionsRows
+					}
 				}
 			}
 			.headerProminence(.increased)  // or remove; preference
@@ -221,7 +271,7 @@ struct ContentView: View {
 						.padding(6)
 				}
 				.buttonStyle(.plain)
-				.accessibilityLabel("About")
+				.accessibilityLabel("About NextGuess Five")
 			}
 			.padding(.horizontal)
 			.onChange(of: mode) { _, _ in recomputeSuggestions() }
@@ -263,6 +313,7 @@ struct ContentView: View {
 
 			Button("Undo") { undo() }
 				.buttonStyle(.bordered)
+				.disabled(!canUndo)
 
 			Button("Reset") { reset() }
 				.buttonStyle(.bordered)
@@ -275,26 +326,45 @@ struct ContentView: View {
 			HStack {
 				Text(s.word.uppercased())
 					.font(.system(.body, design: .monospaced))
-					.frame(width: 70, alignment: .leading)
+					.frame(width: 90, alignment: .leading)
 
 				Spacer()
 
-				Text(String(format: "H: %.2f", s.entropy)).font(.caption)
-				Text("W: \(s.worstBucket)").font(.caption)
-				Text(String(format: "E: %.1f", s.expectedRemaining)).font(
-					.caption
-				)
+				if !isShowingPrecomputedOpeners {
+					Text(String(format: "H: %.2f", s.entropy))
+						.font(.caption)
 
-				if s.isCandidate { Text("✓").font(.caption) }
+					Text("W: \(s.worstBucket)")
+						.font(.caption)
+
+					Text(String(format: "E: %.1f", s.expectedRemaining))
+						.font(.caption)
+
+					if s.isCandidate {
+						Text("✓")
+							.font(.caption)
+					}
+				} else {
+					Text("Precomputed opener")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
 			}
 			.contentShape(Rectangle())
 			.listRowInsets(
-				EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
+				EdgeInsets(
+					top: 10,
+					leading: 14,
+					bottom: 10,
+					trailing: 14
+				)
 			)
 			.onTapGesture {
 				rows[rows.count - 1].word = s.word.uppercased()
 				rows[rows.count - 1].colors = [0, 0, 0, 0, 0]
+
 				UIPasteboard.general.string = s.word.uppercased()
+
 				let generator = UIImpactFeedbackGenerator(style: .light)
 				generator.impactOccurred()
 			}
@@ -311,11 +381,11 @@ struct ContentView: View {
 				ScrollView {
 					VStack(alignment: .leading, spacing: 14) {
 
-						Text("About")
+						Text("About NextGuess Five")
 							.font(.title2).bold()
 
 						Text(
-							"This app helps you solve Wordle by ranking guesses using information theory and worst-case splitting. After each Wordle guess, enter the color feedback and the solver will narrow candidates and suggest the next best guesses."
+							"NextGuess Five helps solve five-letter word puzzles by ranking guesses using information theory and worst-case analysis. After each guess, enter the puzzle’s color feedback and the app will narrow the possible answers and recommend the strongest next guesses."
 						)
 						.font(.body)
 
@@ -328,7 +398,7 @@ struct ContentView: View {
 							Text(
 								"1) Type a 5-letter guess (only valid allowed words enable Add Guess)."
 							)
-							Text("2) Tap each tile to match Wordle feedback:")
+							Text("2) Tap each tile to match the puzzle feedback:")
 							Text("   • Gray = letter not in the word")
 							Text(
 								"   • Yellow = letter in the word, wrong position"
@@ -388,13 +458,13 @@ struct ContentView: View {
 							.font(.headline)
 
 						Text(
-							"When enabled, suggestions are restricted to guesses that satisfy known constraints (similar to Wordle hard mode)."
+							"When enabled, suggestions are restricted to guesses that satisfy all currently known letter and position constraints."
 						)
 						.font(.body)
 					}
 					.padding()
 				}
-				.navigationTitle("Wordle Solver")
+				.navigationTitle("NextGuess Five")
 				.toolbar {
 					ToolbarItem(placement: .topBarTrailing) {
 						Button("Done") { dismiss() }
@@ -418,6 +488,10 @@ struct ContentView: View {
 				rows[rows.count - 1].word = cleaned
 			}
 		)
+	}
+	
+	private var canUndo: Bool {
+		rows.count > 1
 	}
 
 	private func currentColors() -> [Int] {
@@ -461,9 +535,7 @@ struct ContentView: View {
 	}
 
 	private func undo() {
-		// rows = [completed guesses..., current input row]
-		// Need at least 1 completed guess to undo
-		guard rows.count > 1 else { return }
+		guard canUndo else { return }
 
 		// 1) Remove the current input row
 		rows.removeLast()
@@ -557,10 +629,17 @@ struct ContentView: View {
 	}
 
 	private func recomputeSuggestions() {
-		// If no feedback entered yet (start of game), show precomputed openers instantly
-		if solver.candidateCount == solver.answers.count && rows.count == 1
-			&& (rows.first?.word.isEmpty ?? true)
-		{
+		// Contradictory feedback: no answers remain.
+		if solver.candidateCount == 0 {
+			suggestions = []
+			return
+		}
+
+		// No feedback entered yet: show precomputed openers instantly.
+		if solver.candidateCount == solver.answers.count &&
+			rows.count == 1 &&
+			(rows.first?.word.isEmpty ?? true) {
+
 			suggestions = openers.prefix(10).map {
 				WordleSolver.Suggestion(
 					word: $0,
@@ -575,6 +654,7 @@ struct ContentView: View {
 		}
 
 		let known = computeKnownInfo()
+
 		suggestions = solver.suggest(
 			topK: 10,
 			hardMode: hardMode,
