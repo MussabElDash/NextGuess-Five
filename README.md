@@ -8,6 +8,7 @@ NextGuess Five is a fast, data-driven companion for five-letter word puzzles. It
 
 - **Best-next-guess recommendations** based on proven strategy metrics (entropy / expected remaining / minimax).
 - **Instant candidate narrowing** after each round of feedback (gray/yellow/green).
+- **Extended fallback search** across all allowed words if the primary answer list reaches zero.
 - **Multiple solving modes** to match different play styles:
   - **Hybrid (default)**: balanced and strong overall
   - **Average (Entropy)**: fastest average progress
@@ -91,6 +92,12 @@ These files are expected in the app bundle:
   Pre-ranked “best opener” guesses for instant first-screen suggestions.
 
 > ⚠️ IMPORTANT: `patterns.bin` is only valid if `answers_clean.txt` and `allowed_combined_sorted.txt` match the **same ordering** used when generating it.
+
+The solver normally ranks against the curated primary answer set. If no primary
+answer matches all entered feedback, it automatically filters the full allowed
+list and clearly labels the results as extended candidates. Feedback patterns
+for this uncommon fallback path are calculated on device, so the bundled
+precomputed table does not need to grow.
 
 ---
 
