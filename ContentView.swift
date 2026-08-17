@@ -68,6 +68,10 @@ struct ContentView: View {
 		solver.candidateCount == 0
 	}
 
+	private var candidateLabel: String {
+		solver.isUsingExtendedCandidates ? "Extended candidates" : "Candidates"
+	}
+
 	private var fieldState: GuessTextFieldTile.FieldState {
 		if currentGuess.count < 5 { return .typing }
 		return canAddGuess ? .valid : .invalid
@@ -107,9 +111,13 @@ struct ContentView: View {
 					.foregroundStyle(.secondary)
 					.frame(maxWidth: .infinity, alignment: .center)
 			}
-			Text("Candidates: \(solver.candidateCount)")
+			Text("\(candidateLabel): \(solver.candidateCount)")
 				.font(.headline)
 				.frame(maxWidth: .infinity, alignment: .center)
+
+			if solver.isUsingExtendedCandidates && !hasNoCandidates {
+				extendedSearchNotice
+			}
 
 			inputArea
 				.frame(maxWidth: .infinity, alignment: .center)
@@ -171,8 +179,12 @@ struct ContentView: View {
 						.foregroundStyle(.secondary)
 				}
 
-				Text("Candidates: \(solver.candidateCount)")
+				Text("\(candidateLabel): \(solver.candidateCount)")
 					.font(.headline)
+
+				if solver.isUsingExtendedCandidates && !hasNoCandidates {
+					extendedSearchNotice
+				}
 
 				inputArea
 				actionButtons
@@ -318,6 +330,17 @@ struct ContentView: View {
 			Button("Reset") { reset() }
 				.buttonStyle(.bordered)
 		}
+	}
+
+	private var extendedSearchNotice: some View {
+		Label(
+			"No matches in the primary answer set. Searching the extended word list.",
+			systemImage: "magnifyingglass"
+		)
+		.font(.caption)
+		.foregroundStyle(.secondary)
+		.multilineTextAlignment(.center)
+		.padding(.horizontal)
 	}
 
 	@ViewBuilder
@@ -629,7 +652,7 @@ struct ContentView: View {
 	}
 
 	private func recomputeSuggestions() {
-		// Contradictory feedback: no answers remain.
+		// No primary or extended candidates match the feedback.
 		if solver.candidateCount == 0 {
 			suggestions = []
 			return

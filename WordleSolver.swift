@@ -24,10 +24,23 @@ struct WordleSolver {
 
 	// Candidates stored as indices into `answers`
 	private var candidateAnswerIndices: [Int]
+	// Fallback candidates are indices into `allowed`.
+	private var extendedCandidateIndices: [Int] = []
+	private var observations: [(guessIndex: Int, patternCode: UInt8)] = []
+	private(set) var isUsingExtendedCandidates = false
 
 	// For UI only (avoid using this in hot loops)
-	var candidates: [String] { candidateAnswerIndices.map { answers[$0] } }
-	var candidateCount: Int { candidateAnswerIndices.count }
+	var candidates: [String] {
+		if isUsingExtendedCandidates {
+			return extendedCandidateIndices.map { allowed[$0] }
+		}
+		return candidateAnswerIndices.map { answers[$0] }
+	}
+	var candidateCount: Int {
+		isUsingExtendedCandidates
+			? extendedCandidateIndices.count
+			: candidateAnswerIndices.count
+	}
 
 	init(answers: [String], allowed: [String]) {
 		self.answers = answers
@@ -68,17 +81,79 @@ struct WordleSolver {
 
 	mutating func reset() {
 		candidateAnswerIndices = Array(answers.indices)
+		extendedCandidateIndices = []
+		observations = []
+		isUsingExtendedCandidates = false
 	}
 
 	mutating func apply(guess: String, patternCode: Int) {
-		guard let gi = allowedIndexByWord[guess] else { return }
+		guard let gi = allowedIndexByWord[guess.lowercased()],
+			(0..<Self.patternCount).contains(patternCode)
+		else { return }
+
+		let target = UInt8(patternCode)
+		observations.append((gi, target))
+
+		if isUsingExtendedCandidates {
+			extendedCandidateIndices = extendedCandidateIndices.filter { ai in
+				Self.patternCode(guess: allowed[gi], answer: allowed[ai]) == target
+			}
+			return
+		}
+
 		let A = answers.count
 		let base = gi * A
-		let target = UInt8(patternCode)
 
 		candidateAnswerIndices = candidateAnswerIndices.filter { ai in
 			patternTable[base + ai] == target
 		}
+
+		if candidateAnswerIndices.isEmpty {
+			activateExtendedCandidates()
+		}
+	}
+
+	private mutating func activateExtendedCandidates() {
+		isUsingExtendedCandidates = true
+		extendedCandidateIndices = allowed.indices.filter { answerIndex in
+			observations.allSatisfy { observation in
+				Self.patternCode(
+					guess: allowed[observation.guessIndex],
+					answer: allowed[answerIndex]
+				) == observation.patternCode
+			}
+		}
+	}
+
+	private static func patternCode(guess: String, answer: String) -> UInt8 {
+		let guessLetters = Array(guess.utf8)
+		let answerLetters = Array(answer.utf8)
+		var result = Array(repeating: UInt8(0), count: 5)
+		var remainingCounts = Array(repeating: 0, count: 26)
+
+		for i in 0..<5 {
+			if guessLetters[i] == answerLetters[i] {
+				result[i] = 2
+			} else {
+				remainingCounts[Int(answerLetters[i] - 97)] += 1
+			}
+		}
+
+		for i in 0..<5 where result[i] == 0 {
+			let letterIndex = Int(guessLetters[i] - 97)
+			if remainingCounts[letterIndex] > 0 {
+				result[i] = 1
+				remainingCounts[letterIndex] -= 1
+			}
+		}
+
+		var code = 0
+		var powerOfThree = 1
+		for value in result {
+			code += Int(value) * powerOfThree
+			powerOfThree *= 3
+		}
+		return UInt8(code)
 	}
 
 	struct Suggestion: Identifiable {
@@ -103,12 +178,11 @@ struct WordleSolver {
 		mode: SolverMode = .hybrid,
 		known: KnownInfo? = nil
 	) -> [Suggestion] {
-		let n = candidateAnswerIndices.count
+		let n = candidateCount
 		guard n > 0 else { return [] }
 
 		// If only one candidate, return it directly
-		if n == 1, let onlyIndex = candidateAnswerIndices.first {
-			let w = answers[onlyIndex]
+		if n == 1, let w = candidates.first {
 			return [
 				Suggestion(
 					word: w,
@@ -128,20 +202,13 @@ struct WordleSolver {
 		let guessIndices: [Int]
 		if hardMode {
 			// Only allow guesses that are still possible answers (but must map into allowed list)
-			// Since your allowed list includes answers, this will work.
-			guessIndices = candidateAnswerIndices.compactMap {
-				allowedIndexByWord[answers[$0]]
-			}
+			guessIndices = candidateAllowedIndices
 		} else {
 			guessIndices = Array(allowed.indices)
 		}
 
 		// For isCandidate marking in UI
-		let candidateAllowedSet: Set<Int> = Set(
-			candidateAnswerIndices.compactMap {
-				allowedIndexByWord[answers[$0]]
-			}
-		)
+		let candidateAllowedSet = Set(candidateAllowedIndices)
 
 		var results: [Suggestion] = []
 		results.reserveCapacity(min(topK, guessIndices.count))
@@ -150,10 +217,17 @@ struct WordleSolver {
 		for gi in guessIndices {
 			var counts = Array(repeating: 0, count: Self.patternCount)
 
-			let base = gi * A
-			for ai in candidateAnswerIndices {
-				let p = Int(patternTable[base + ai])
-				counts[p] += 1
+			if isUsingExtendedCandidates {
+				for ai in extendedCandidateIndices {
+					let p = Int(Self.patternCode(guess: allowed[gi], answer: allowed[ai]))
+					counts[p] += 1
+				}
+			} else {
+				let base = gi * A
+				for ai in candidateAnswerIndices {
+					let p = Int(patternTable[base + ai])
+					counts[p] += 1
+				}
 			}
 
 			var entropy = 0.0
@@ -260,6 +334,13 @@ struct WordleSolver {
 		}
 
 		return Array(results.prefix(topK))
+	}
+
+	private var candidateAllowedIndices: [Int] {
+		if isUsingExtendedCandidates {
+			return extendedCandidateIndices
+		}
+		return candidateAnswerIndices.compactMap { allowedIndexByWord[answers[$0]] }
 	}
 }
 
